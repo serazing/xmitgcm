@@ -17,7 +17,8 @@ _DROPPED_COORDS = ['dxC', 'dyC', 'dxG', 'dyG',
                    'hFacC', 'hFacS', 'hFacW',
                    'Depth', 'PHrefC', 'drF']
 
-def _extract_grid(ds, output_dir='', prefix='llc', format='NETCDF4_CLASSIC',
+def _extract_grid(ds_grid, output_dir='', prefix='llc',
+                  format='NETCDF4_CLASSIC',
                   overwrite=False, **indexers):
     """
     ds: Dataset
@@ -28,7 +29,6 @@ def _extract_grid(ds, output_dir='', prefix='llc', format='NETCDF4_CLASSIC',
         The output directory, by default it is set to the current directory
     """
     new_indexers = indexers.copy()
-    ds_grid = ds.drop([var for var in ds.data_vars])
     if 'time' in new_indexers:
         del new_indexers['time']
     grid_dir = output_dir + '/grid'
@@ -44,7 +44,7 @@ def _extract_grid(ds, output_dir='', prefix='llc', format='NETCDF4_CLASSIC',
         ds_grid_subset.to_netcdf(path, format=format)
 
 
-def _find_indexers(ds, lat_min=-90, lat_max=90, lon_min=0, lon_max=360):
+def _find_indexers(ds_grid, lat_min=-90, lat_max=90, lon_min=0, lon_max=360):
 	"""Find indexers relative to one particular region of the globe defined
 	 by its latitude and longitude boundaries
 
@@ -66,10 +66,10 @@ def _find_indexers(ds, lat_min=-90, lat_max=90, lon_min=0, lon_max=360):
 	indexers :
 		A dictionary of slices to be used with `xarray.Dataset.isel`
 	"""
-	condC = ((ds.XC > lon_min) & (ds.XC < lon_max) &
-	         (ds.YC > lat_min) & (ds.YC < lat_max))
-	condG = ((ds.XG > lon_min) & (ds.XG < lon_max) &
-	         (ds.YG > lat_min) & (ds.YG < lat_max))
+	condC = ((ds_grid.XC > lon_min) & (ds_grid.XC < lon_max) &
+	         (ds_grid.YC > lat_min) & (ds_grid.YC < lat_max))
+	condG = ((ds_grid.XG > lon_min) & (ds_grid.XG < lon_max) &
+	         (ds_grid.YG > lat_min) & (ds_grid.YG < lat_max))
 	booleanC = condC.where(condC, drop=True)
 	booleanG = condG.where(condG, drop=True)
 	i = booleanC.i.data
@@ -79,6 +79,7 @@ def _find_indexers(ds, lat_min=-90, lat_max=90, lon_min=0, lon_max=360):
 	indexers = {'i': slice(i[0], i[-1]), 'j': slice(j[0], j[-1]),
 	            'i_g': slice(i_g[0], i_g[-1]), 'j_g': slice(j_g[0], j_g[-1]),
 	            'face': booleanC.face.data}
+	del condC, condG
 	return indexers
 
 
@@ -233,14 +234,17 @@ def _concatenate(ds, var, mode='monthly', output_dir='', prefix='llc',
 
 def mds_to_netcdf(ds, vars, lat_min=-90, lat_max=90, lon_min=0, lon_max=360,
                   output_dir='./', prefix='llc', extract_grid=True,
-                  format='NETCDF4_CLASSIC', concatenate=None, overwrite=True):
+                  format='NETCDF4_CLASSIC', concatenate=None, overwrite=True,
+                  chunks=None):
 
+	ds_grid = ds.drop([var for var in ds.data_vars])
 	#First find the indexers
-	indexers = _find_indexers(ds, lat_min=lat_min, lat_max=lat_max,
+	indexers = _find_indexers(ds_grid, lat_min=lat_min, lat_max=lat_max,
 	                          lon_min=lon_min, lon_max=lon_max)
-	# Then extract the grid
-	_extract_grid(ds, output_dir=output_dir, prefix=prefix,
-	              format=format, overwrite=False, **indexers)
+	if extract_grid:
+		# Then extract the grid
+		_extract_grid(ds_grid, output_dir=output_dir, prefix=prefix,
+	                  format=format, overwrite=False, **indexers)
 	# Then extract the variables
 	for var in vars:
 		for t in range(ds.time.size):
@@ -250,8 +254,7 @@ def mds_to_netcdf(ds, vars, lat_min=-90, lat_max=90, lon_min=0, lon_max=360,
 		# Contenate files if asked
 		if concatenate is not None:
 			ds_netcdf = xr.open_mfdataset(output_dir + '/%s/*.nc' % var,
-			                              concat_dim='time',
-			                              chunks={'time':100})
+			                              concat_dim='time', chunks=chunks)
 			_concatenate(ds_netcdf, var, mode=concatenate,
 			             output_dir=(output_dir + '/' + var), prefix=prefix,
 			             format=format, overwrite=overwrite)
