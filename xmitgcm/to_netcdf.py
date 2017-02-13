@@ -44,45 +44,6 @@ def _extract_grid(ds_grid, output_dir='', prefix='llc',
         ds_grid_subset.to_netcdf(path, format=format)
 
 
-def _find_indexers(ds_grid, lat_min=-90, lat_max=90, lon_min=0, lon_max=360):
-	"""Find indexers relative to one particular region of the globe defined
-	 by its latitude and longitude boundaries
-
-	 Parameters
-	 ----------
-	 ds : xarray.Dataset
-	    The dataset opened by using `xmitgcm.open_mdsdataset`
-	 lat_min : float, optional
-	    Minimum latitude
-	 lat_max : float, optional
-	    Maximum latitude
-	 lon_min : float, optional
-	    Minimum longitude
-	 lon_max : float, optional
-	    Maximum longitude
-
-	Returns
-	-------
-	indexers :
-		A dictionary of slices to be used with `xarray.Dataset.isel`
-	"""
-	condC = ((ds_grid.XC > lon_min) & (ds_grid.XC < lon_max) &
-	         (ds_grid.YC > lat_min) & (ds_grid.YC < lat_max))
-	condG = ((ds_grid.XG > lon_min) & (ds_grid.XG < lon_max) &
-	         (ds_grid.YG > lat_min) & (ds_grid.YG < lat_max))
-	booleanC = condC.where(condC, drop=True)
-	booleanG = condG.where(condG, drop=True)
-	i = booleanC.i.data
-	j = booleanC.j.data.astype(int)
-	i_g = booleanG.i_g.data
-	j_g = booleanG.j_g.data.astype(int)
-	indexers = {'i': slice(i[0], i[-1]), 'j': slice(j[0], j[-1]),
-	            'i_g': slice(i_g[0], i_g[-1]), 'j_g': slice(j_g[0], j_g[-1]),
-	            'face': booleanC.face.data}
-	del condC, condG
-	return indexers
-
-
 def _extract_var(ds, var, output_dir='', prefix='llc',
                  format='NETCDF4_CLASSIC', encoding=None, overwrite=False,
                  **indexers):
@@ -232,15 +193,10 @@ def _concatenate(ds, var, mode='monthly', output_dir='', prefix='llc',
 					raise ValueError('%s is not a valid mode' % mode)
 
 
-def mds_to_netcdf(ds, vars, lat_min=-90, lat_max=90, lon_min=0, lon_max=360,
-                  output_dir='./', prefix='llc', extract_grid=True,
+def mds_to_netcdf(ds, vars, output_dir='./', prefix='llc', extract_grid=True,
                   format='NETCDF4_CLASSIC', concatenate=None, overwrite=True,
-                  chunks=None):
-
+                  chunks=None, **indexers):
 	ds_grid = ds.drop([var for var in ds.data_vars])
-	#First find the indexers
-	indexers = _find_indexers(ds_grid, lat_min=lat_min, lat_max=lat_max,
-	                          lon_min=lon_min, lon_max=lon_max)
 	if extract_grid:
 		# Then extract the grid
 		_extract_grid(ds_grid, output_dir=output_dir, prefix=prefix,

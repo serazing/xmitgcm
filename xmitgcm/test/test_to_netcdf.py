@@ -97,7 +97,8 @@ def test_mds_to_netcdf(all_mds_datadirs):
                                  delta_t=expected['delta_t'],
                                  default_dtype=expected['dtype'],
                                  geometry=expected['geometry'])
+    indexers = xmitgcm.find_indexers(ds, lat_min = -60, lat_max = 0,
+                                     lon_min = 150, lon_max = 180)
     xmitgcm.mds_to_netcdf(ds, ['Eta', 'U', 'V', 'T', 'S'],
-	                      lat_min=-60, lat_max=0, lon_min=150, lon_max=180,
                           output_dir=dirname, extract_grid=True,
-                          concatenate='daily', overwrite=True)
+                          concatenate='daily', overwrite=True, **indexers)

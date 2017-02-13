@@ -446,3 +446,41 @@ def llc_data_shape(llc_id, nz=None):
     # should we accomodate multiple records?
     # no, not in this function
     return data_shape
+
+def find_indexers(ds, lat_min=-90, lat_max=90, lon_min=0, lon_max=360):
+	"""Find indexers relative to one particular region of the globe defined
+	 by its latitude and longitude boundaries
+
+	 Parameters
+	 ----------
+	 ds : xarray.Dataset
+	    The dataset opened by using `xmitgcm.open_mdsdataset`
+	 lat_min : float, optional
+	    Minimum latitude
+	 lat_max : float, optional
+	    Maximum latitude
+	 lon_min : float, optional
+	    Minimum longitude
+	 lon_max : float, optional
+	    Maximum longitude
+
+	Returns
+	-------
+	indexers :
+		A dictionary of slices to be used with `xarray.Dataset.isel`
+	"""
+	condC = ((ds.XC > lon_min) & (ds.XC < lon_max) &
+             (ds.YC > lat_min) & (ds.YC < lat_max))
+	condG = ((ds.XG > lon_min) & (ds.XG < lon_max) &
+             (ds.YG > lat_min) & (ds.YG < lat_max))
+	booleanC = condC.where(condC, drop=True)
+	booleanG = condG.where(condG, drop=True)
+	i = booleanC.i.data
+	j = booleanC.j.data.astype(int)
+	i_g = booleanG.i_g.data
+	j_g = booleanG.j_g.data.astype(int)
+	indexers = {'i': slice(i[0], i[-1]), 'j': slice(j[0], j[-1]),
+	            'i_g': slice(i_g[0], i_g[-1]), 'j_g': slice(j_g[0], j_g[-1]),
+	            'face': booleanC.face.data}
+	del condC, condG
+	return indexers
