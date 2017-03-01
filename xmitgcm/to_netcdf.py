@@ -68,7 +68,10 @@ def _extract_var(ds, var, output_dir='', prefix='llc',
     """
 	if encoding is None:
 	    encoding = {'dtype': 'float32'}
-	var_subset = (ds.drop(_DROPPED_COORDS).isel(**indexers))[var]
+	try:
+		var_subset = (ds.drop(_DROPPED_COORDS).isel(**indexers))[var]
+	except ValueError:
+		var_subset.isel(**indexers)[var]
 	var_subset.attrs['_FillValue'] = 0.
 	ds_subset = var_subset.to_dataset()
     # General Attributes
