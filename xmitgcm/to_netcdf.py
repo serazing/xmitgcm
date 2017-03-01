@@ -207,11 +207,18 @@ def mds_to_netcdf(ds, vars, output_dir='./', prefix='llc', extract_grid=True,
 			indexers['time'] = t
 			_extract_var(ds, var, output_dir=output_dir, prefix=prefix,
                          format=format, overwrite=False, **indexers)
-		# Contenate files if asked
-		if concatenate is not None:
-			ds_netcdf = xr.open_mfdataset(output_dir + '/%s/*.nc' % var,
-			                              concat_dim='time', chunks=chunks)
-			_concatenate(ds_netcdf, var, mode=concatenate,
-			             output_dir=(output_dir + '/' + var), prefix=prefix,
-			             format=format, overwrite=overwrite)
 
+		# Contenate files if asked
+		if concatenate in ['monthly', 'daily']:
+			for month in range(1, 13):
+				try:
+					files = output_dir + '/%s/*m%02i*.nc' %(var, month)
+					ds_netcdf = xr.open_mfdataset(files, concat_dim='time',
+				                                  chunks=chunks)
+					_concatenate(ds_netcdf, var, mode=concatenate,
+				                 output_dir=(output_dir + '/' + var),
+				                 prefix=prefix, format=format,
+				                 overwrite=overwrite)
+					del(ds_netcdf)
+				except IOError:
+					pass
