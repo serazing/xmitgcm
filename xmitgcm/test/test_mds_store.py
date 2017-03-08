@@ -307,7 +307,12 @@ def test_read_mds_no_meta(all_mds_datadirs):
             assert res[prefix].shape == shape
 
 @pytest.mark.parametrize("method", ["smallchunks", "bigchunks"])
-def test_read_raw_data_llc(llc_mds_datadirs, method):
+@pytest.mark.parametrize("memmap", [True, False])
+def test_read_raw_data_llc(llc_mds_datadirs, method, memmap):
+    if memmap and method=='smallchunks':
+        pytest.skip("Using `method='smallchunks` with `memmap=True` "
+                    "opens too many files.")
+
     dirname, expected = llc_mds_datadirs
 
     from xmitgcm.utils import read_3d_llc_data
@@ -321,12 +326,15 @@ def test_read_raw_data_llc(llc_mds_datadirs, method):
     dtype = expected['dtype'].newbyteorder('>')
 
     # if we use memmap=True, we open too many files
-    kwargs = dict(method=method, dtype=dtype, memmap=False)
+    kwargs = dict(method=method, dtype=dtype, memmap=memmap)
 
     fname = os.path.join(dirname, 'T.%010d.data' % expected['test_iternum'])
     data = read_3d_llc_data(fname, nz, nx, **kwargs)
     assert data.shape == shape
-    assert data.compute().shape == shape
+    dc = data.compute()
+    assert dc.shape == shape
+    # once computed, all arrays are ndarray, even if backed by memmap
+    assert isinstance(dc, np.ndarray)
 
     fname = os.path.join(dirname, 'XC.data')
     data = read_3d_llc_data(fname, 1, nx, **kwargs)
@@ -381,6 +389,17 @@ def test_open_mdsdataset_minimal(all_mds_datadirs):
     ds_expected = xr.Dataset(coords=coords)
     assert ds_expected.equals(ds)
 
+    # check for comodo metadata needed by xgcm
+    assert ds['i'].attrs['axis'] == 'X'
+    assert ds['i_g'].attrs['axis'] == 'X'
+    assert ds['i_g'].attrs['c_grid_axis_shift'] == -0.5
+    assert ds['j'].attrs['axis'] == 'Y'
+    assert ds['j_g'].attrs['axis'] == 'Y'
+    assert ds['j_g'].attrs['c_grid_axis_shift'] == -0.5
+    assert ds['k'].attrs['axis'] == 'Z'
+    assert ds['k_l'].attrs['axis'] == 'Z'
+    assert ds['k_l'].attrs['c_grid_axis_shift'] == -0.5
+
 def test_read_grid(all_mds_datadirs):
     """Make sure we read all the grid variables."""
     dirname, expected = all_mds_datadirs
@@ -391,6 +410,8 @@ def test_read_grid(all_mds_datadirs):
     for vname in _EXPECTED_GRID_VARS:
         assert vname in ds
 
+    # actually load the data, to check for dask-related errors
+    ds.load()
 
 def test_values_and_endianness(all_mds_datadirs):
     """Make sure we read all the grid variables."""
@@ -498,6 +519,17 @@ def test_swap_dims(all_mds_datadirs):
                     grid_vars_to_coords=True)
 
 
+        # check for comodo metadata needed by xgcm
+        assert ds['XC'].attrs['axis'] == 'X'
+        assert ds['XG'].attrs['axis'] == 'X'
+        assert ds['XG'].attrs['c_grid_axis_shift'] == -0.5
+        assert ds['YC'].attrs['axis'] == 'Y'
+        assert ds['YG'].attrs['axis'] == 'Y'
+        assert ds['YG'].attrs['c_grid_axis_shift'] == -0.5
+        assert ds['Z'].attrs['axis'] == 'Z'
+        assert ds['Zl'].attrs['axis'] == 'Z'
+        assert ds['Zl'].attrs['c_grid_axis_shift'] == -0.5
+
         # add extra layers dimensions if needed
         if 'layers' in expected:
             for layer_name in expected['layers']:
@@ -510,7 +542,8 @@ def test_swap_dims(all_mds_datadirs):
         # make sure swapping works with multiple iters
         ds = xmitgcm.open_mdsdataset(dirname, geometry=expected['geometry'],
                                      prefix=['S'])
-        print(ds)
+        #print(ds)
+        ds.load()
         assert 'XC' in ds['S'].dims
         assert 'YC' in ds['S'].dims
 

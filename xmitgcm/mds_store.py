@@ -226,8 +226,7 @@ def _set_coords(ds):
 def _swap_dimensions(ds, geometry, drop_old=True):
     """Replace logical coordinates with physical ones. Does not work for llc.
     """
-    # TODO: handle metadata correctly such that the new dimension attributes
-    # still conform to comodo conventions
+    keep_attrs = ['axis', 'c_grid_axis_shift']
 
     # this fixes problems
     ds = ds.reset_coords()
@@ -246,6 +245,9 @@ def _swap_dimensions(ds, geometry, drop_old=True):
                     # take the first row / column
                     coord_var = coord_var.isel(**{coord_dim: 0}).drop(coord_dim)
             ds[new_dim] = coord_var
+            for key in keep_attrs:
+                if key in ds[orig_dim].attrs:
+                    ds[new_dim].attrs[key] = ds[orig_dim].attrs[key]
     # then swap dims
     for orig_dim in ds.dims:
         if 'swap_dim' in ds[orig_dim].attrs:
@@ -448,7 +450,7 @@ class _MDSDataStore(xr.backends.common.AbstractDataStore):
             if len(data)==self.nz:
                 #create a new array which will replace it
                 drc_data = np.zeros(self.nz + 1)
-                drc_data[:-1] = data
+                drc_data[:-1] = np.asarray(data)
                 #fill in the missing value
                 drc_data[-1] = 0.5 * data[-1]
                 data = drc_data
@@ -561,7 +563,9 @@ class _MDSDataStore(xr.backends.common.AbstractDataStore):
                 dims = dims[1:]
             elif len(dims) == 1 and (data.ndim == 2 or data.ndim == 3):
                 # this is for certain profile data like RC, PHrefC, etc.
-                data = np.atleast_1d(data.squeeze())
+                # for some reason, dask arrays don't work here
+                # ok to promote to numpy array because data is always 1D
+                data = np.atleast_1d(np.asarray(data).squeeze())
 
             if self.llc:
                 dims, data = _reshape_for_llc(dims, data)
