@@ -214,7 +214,7 @@ def mds_to_netcdf(ds, vars, output_dir='./', prefix='llc', extract_grid=True,
 		grid_dir = output_dir + '/grid'
 		path = grid_dir + '/%s_grid.nc' % prefix
 		ds_grid = xr.open_dataset(path)
-		ds = ds.assign_coords(**ds_grid.data_vars)
+		ds = ds.assign_coords(**ds_grid.coords)
 	# Then extract the variables
 	for var in vars:
 		for t in range(ds.time.size):
