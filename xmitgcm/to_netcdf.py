@@ -122,7 +122,8 @@ def _concatenate(ds, var, mode='monthly', output_dir='', prefix='llc',
 	format : {`NETCDF4`, `NETCDF4_CLASSIC`, `NETCDF3_64BIT`,
     `NETCDF3_CLASSIC`], optional
 	encoding : dict, optional
-		Dictionary of variable specific encoding. Default is `{'zlib': True, 'complevel': 1}`
+		Dictionary of variable specific encoding. Default is `{'zlib': True,
+		'complevel': 1}`
 	"""
 	if encoding is None:
 		encoding = {'dtype': 'float32', 'zlib': True, 'complevel': 1}
@@ -199,11 +200,17 @@ def _concatenate(ds, var, mode='monthly', output_dir='', prefix='llc',
 def mds_to_netcdf(ds, vars, output_dir='./', prefix='llc', extract_grid=True,
                   format='NETCDF4_CLASSIC', concatenate=None, overwrite=True,
                   chunks=None, **indexers):
-	ds_grid = ds.drop([var for var in ds.data_vars])
+
 	if extract_grid:
+		ds_grid = ds.drop([var for var in ds.data_vars])
 		# Then extract the grid
 		_extract_grid(ds_grid, output_dir=output_dir, prefix=prefix,
 	                  format=format, overwrite=False, **indexers)
+	else:
+		grid_dir = output_dir + '/grid'
+		path = grid_dir + '/%s_grid.nc' % prefix
+		ds_grid = xr.open_dataset(path)
+		ds = ds.assign(ds_grid.data_vars)
 	# Then extract the variables
 	for var in vars:
 		for t in range(ds.time.size):
