@@ -203,6 +203,10 @@ def mds_to_netcdf(ds, vars, output_dir='./', prefix='llc', extract_grid=True,
 
 	if extract_grid:
 		ds_grid = ds.drop([var for var in ds.data_vars])
+		try:
+			ds_grid = ds_grid.drop(['iter', 'time'])
+		except ValueError:
+			pass
 		# Then extract the grid
 		_extract_grid(ds_grid, output_dir=output_dir, prefix=prefix,
 	                  format=format, overwrite=False, **indexers)
